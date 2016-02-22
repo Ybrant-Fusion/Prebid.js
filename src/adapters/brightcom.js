@@ -5,18 +5,18 @@ var bidmanager = require('../bidmanager.js');
 var adloader = require('../adloader');
 
 /**
- * Adapter for requesting bids from Compass
+ * Adapter for requesting bids from Brightcom
  */
-var CompassAdapter = function CompassAdapter() {
+var BrightcomAdapter = function BrightcomAdapter() {
     
-    // Set Compass Bidder URL
-    var compassUrl = 'hb.iselephant.com/auc/ortb';
+    // Set Brightcom Bidder URL
+    var brightcomUrl = 'hb.iselephant.com/auc/ortb';
 
     // Define the bidder code
-    var compassBidderCode = 'compass';
+    var brightcomBidderCode = 'brightcom';
 
     // Define the callback function
-    var compassCallbackFunction = 'window.pbjs.compassResponse';
+    var brightcomCallbackFunction = 'window.pbjs.brightcomResponse';
 
     // Manage the requested and received ad units' codes, to know which are invalid (didn't return)
     var reqAdUnitsCode = [],
@@ -31,7 +31,7 @@ var CompassAdapter = function CompassAdapter() {
         var sitePage = window.location.pathname + location.search + location.hash;
 
         // Prepare impressions object
-        var compassImps = [];
+        var brightcomImps = [];
 
         // Prepare a variable for publisher id
         var pubId = '';
@@ -51,7 +51,7 @@ var CompassAdapter = function CompassAdapter() {
                 pubId = utils.getBidIdParamater('pubId', bid.params);
             }
 
-            // Compass supports only 1 size per impression
+            // Brightcom supports only 1 size per impression
             // Check if the array contains 1 size or array of sizes
             if (bid.sizes.length === 2 && typeof bid.sizes[0] === 'number' && typeof bid.sizes[1] === 'number') {
                 // The array contains 1 size (the items are the values)
@@ -81,7 +81,7 @@ var CompassAdapter = function CompassAdapter() {
             }
 
             // Add current impression to collection
-            compassImps.push(imp);
+            brightcomImps.push(imp);
             // Add mapping to current bid via impression id
             bidmanager.pbCallbackMap[imp.id] = bid;
 
@@ -91,9 +91,9 @@ var CompassAdapter = function CompassAdapter() {
         });
 
         // Build the bid request
-        var compassBidReq = {
+        var brightcomBidReq = {
             id: utils.getUniqueIdentifierStr(),
-            imp: compassImps,
+            imp: brightcomImps,
             site:{
                 publisher: {
                     id: pubId
@@ -106,13 +106,13 @@ var CompassAdapter = function CompassAdapter() {
         // Add timeout data, if available
         var curTimeout = PREBID_TIMEOUT || 0;
         if (curTimeout > 0) {
-            compassBidReq.tmax = curTimeout
+            brightcomBidReq.tmax = curTimeout
         }
 
         // Define the bid request call URL
-        var bidRequestCallUrl = '//' + compassUrl +
-            '?callback=' + compassCallbackFunction +
-            '&request=' + encodeURIComponent(JSON.stringify(compassBidReq));
+        var bidRequestCallUrl = '//' + brightcomUrl +
+            '?callback=' + brightcomCallbackFunction +
+            '&request=' + encodeURIComponent(JSON.stringify(brightcomBidReq));
 
         // Add the call to get the bid
         adloader.loadScript(bidRequestCallUrl, null);
@@ -120,19 +120,19 @@ var CompassAdapter = function CompassAdapter() {
     }
 
     //expose the callback to the global object:
-    pbjs.compassResponse = function(compassResponseObj) {
+    pbjs.brightcomResponse = function(brightcomResponseObj) {
         
         var bid = {};
         
         // Make sure response is valid
         if (
-            (compassResponseObj) && (compassResponseObj.id) && 
-            (compassResponseObj.seatbid) && (compassResponseObj.seatbid.length !== 0) && 
-            (compassResponseObj.seatbid[0].bid) && (compassResponseObj.seatbid[0].bid.length !== 0)
+            (brightcomResponseObj) && (brightcomResponseObj.id) &&
+            (brightcomResponseObj.seatbid) && (brightcomResponseObj.seatbid.length !== 0) &&
+            (brightcomResponseObj.seatbid[0].bid) && (brightcomResponseObj.seatbid[0].bid.length !== 0)
         ) {
 
             // Go through the received bids
-            compassResponseObj.seatbid[0].bid.forEach( function(curBid) {
+            brightcomResponseObj.seatbid[0].bid.forEach( function(curBid) {
 
                 // Get the bid request data
                 var	bidRequest = bidmanager.getPlacementIdByCBIdentifer(curBid.impid);
@@ -158,13 +158,13 @@ var CompassAdapter = function CompassAdapter() {
 
                     // Set the bid data
                     bid.creative_id = curBid.Id;
-                    bid.bidderCode = compassBidderCode;
+                    bid.bidderCode = brightcomBidderCode;
                     bid.cpm = parseFloat(curBid.price);
 
-                    // Compass tag is in <script> block, so use bid.ad, not bid.adurl
+                    // Brightcom tag is in <script> block, so use bid.ad, not bid.adurl
                     bid.ad = responseAd;
 
-                    // Since Compass currently supports only 1 size, if multiple sizes are provided - take the first
+                    // Since Brightcom currently supports only 1 size, if multiple sizes are provided - take the first
                     var adWidth, adHeight;
                     if ((bidRequest.sizes.length === 2) && (typeof bidRequest.sizes[0] === 'number') && (typeof bidRequest.sizes[1] === 'number')) {
                         // Only one size is provided
@@ -191,14 +191,14 @@ var CompassAdapter = function CompassAdapter() {
             
         }
 
-        // Define all unreceived ad unit codes as invalid (if Compass don't want to bid on an impression, it won't include it in the response)
+        // Define all unreceived ad unit codes as invalid (if Brightcom don't want to bid on an impression, it won't include it in the response)
         for (var i = 0; i < reqAdUnitsCode.length; i++) {
             var adUnitCode = reqAdUnitsCode[i];
             // Check if current ad unit code was NOT received
             if (resAdUnitsCode.indexOf(adUnitCode) == -1) {
                 // Current ad unit wasn't returned. Define it as invalid.
                 bid = bidfactory.createBid(2);
-                bid.bidderCode = compassBidderCode;
+                bid.bidderCode = brightcomBidderCode;
                 bidmanager.addBidResponse(adUnitCode, bid);
             }
         }
@@ -210,4 +210,4 @@ var CompassAdapter = function CompassAdapter() {
     };
 };
 
-module.exports = CompassAdapter;
+module.exports = BrightcomAdapter;
