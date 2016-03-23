@@ -46,7 +46,7 @@ var BrightcomAdapter = function BrightcomAdapter() {
             var adHeight=0;
 
             // If no publisher id is set, use the current
-            if (pubId == '') {
+            if (pubId === '') {
                 // Get the current publisher id (if it doesn't exist, it'll return '')
                 pubId = utils.getBidIdParamater('pubId', bid.params);
             }
@@ -74,7 +74,7 @@ var BrightcomAdapter = function BrightcomAdapter() {
             };
 
             // If ref exists, create it (in the "ext" object)
-            if (ref != '') {
+            if (ref !== '') {
                 imp.ext = {
                     refoverride: ref
                 };
@@ -104,9 +104,10 @@ var BrightcomAdapter = function BrightcomAdapter() {
         };
 
         // Add timeout data, if available
-        var curTimeout = PREBID_TIMEOUT || 0;
+        var PREBID_TIMEOUT = PREBID_TIMEOUT || 0;
+        var curTimeout = PREBID_TIMEOUT;
         if (curTimeout > 0) {
-            brightcomBidReq.tmax = curTimeout
+            brightcomBidReq.tmax = curTimeout;
         }
 
         // Define the bid request call URL
@@ -195,7 +196,7 @@ var BrightcomAdapter = function BrightcomAdapter() {
         for (var i = 0; i < reqAdUnitsCode.length; i++) {
             var adUnitCode = reqAdUnitsCode[i];
             // Check if current ad unit code was NOT received
-            if (resAdUnitsCode.indexOf(adUnitCode) == -1) {
+            if (resAdUnitsCode.indexOf(adUnitCode) === -1) {
                 // Current ad unit wasn't returned. Define it as invalid.
                 bid = bidfactory.createBid(2);
                 bid.bidderCode = brightcomBidderCode;
