@@ -16,7 +16,7 @@ var BrightcomAdapter = function BrightcomAdapter() {
     var brightcomBidderCode = 'brightcom';
 
     // Define the callback function
-    var brightcomCallbackFunction = 'window.pbjs.brightcomResponse';
+    var brightcomCallbackFunction = 'window.pbjs=window.pbjs||window.parent.pbjs||window.top.pbjs;window.pbjs.brightcomResponse';
 
     // Manage the requested and received ad units' codes, to know which are invalid (didn't return)
     var reqAdUnitsCode = [],
