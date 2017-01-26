@@ -1,3 +1,5 @@
+import { getBidRequest } from '../utils.js';
+
 var CONSTANTS = require('../constants.json');
 var utils = require('../utils.js');
 var adloader = require('../adloader.js');
@@ -8,55 +10,56 @@ var Adapter = require('./adapter.js');
 var AppNexusAdapter;
 AppNexusAdapter = function AppNexusAdapter() {
   var baseAdapter = Adapter.createNew('appnexus');
+  var usersync = false;
 
   baseAdapter.callBids = function (params) {
-    var bidCode = baseAdapter.getBidderCode();
+    //var bidCode = baseAdapter.getBidderCode();
 
     var anArr = params.bids;
-    var bidsCount = anArr.length;
+
+    //var bidsCount = anArr.length;
 
     //set expected bids count for callback execution
-    bidmanager.setExpectedBidsCount(bidCode, bidsCount);
+    //bidmanager.setExpectedBidsCount(bidCode, bidsCount);
 
-    for (var i = 0; i < bidsCount; i++) {
+    for (var i = 0; i < anArr.length; i++) {
       var bidRequest = anArr[i];
-      var callbackId = utils.getUniqueIdentifierStr();
+      var callbackId = bidRequest.bidId;
       adloader.loadScript(buildJPTCall(bidRequest, callbackId));
 
       //store a reference to the bidRequest from the callback id
-      bidmanager.pbCallbackMap[callbackId] = bidRequest;
+      //bidmanager.pbCallbackMap[callbackId] = bidRequest;
     }
   };
 
   function buildJPTCall(bid, callbackId) {
 
     //determine tag params
-    var placementId = utils.getBidIdParamater('placementId', bid.params);
+    var placementId = utils.getBidIdParameter('placementId', bid.params);
 
     //memberId will be deprecated, use member instead
-    var memberId = utils.getBidIdParamater('memberId', bid.params);
-    var member = utils.getBidIdParamater('member', bid.params);
-    var inventoryCode = utils.getBidIdParamater('invCode', bid.params);
-    var query = utils.getBidIdParamater('query', bid.params);
-    var referrer = utils.getBidIdParamater('referrer', bid.params);
-    var altReferrer = utils.getBidIdParamater('alt_referrer', bid.params);
+    var memberId = utils.getBidIdParameter('memberId', bid.params);
+    var member = utils.getBidIdParameter('member', bid.params);
+    var inventoryCode = utils.getBidIdParameter('invCode', bid.params);
+    var query = utils.getBidIdParameter('query', bid.params);
+    var referrer = utils.getBidIdParameter('referrer', bid.params);
+    var altReferrer = utils.getBidIdParameter('alt_referrer', bid.params);
 
     //build our base tag, based on if we are http or https
 
     var jptCall = 'http' + (document.location.protocol === 'https:' ? 's://secure.adnxs.com/jpt?' : '://ib.adnxs.com/jpt?');
 
-    jptCall = utils.tryAppendQueryString(jptCall, 'callback', 'pbjs.handleAnCB');
+    jptCall = utils.tryAppendQueryString(jptCall, 'callback', '$$PREBID_GLOBAL$$.handleAnCB');
     jptCall = utils.tryAppendQueryString(jptCall, 'callback_uid', callbackId);
     jptCall = utils.tryAppendQueryString(jptCall, 'psa', '0');
     jptCall = utils.tryAppendQueryString(jptCall, 'id', placementId);
     if (member) {
-      jptCall = utils.tryAppendQueryString(jptCall, 'member_id', member);
+      jptCall = utils.tryAppendQueryString(jptCall, 'member', member);
     } else if (memberId) {
-      jptCall = utils.tryAppendQueryString(jptCall, 'member_id', memberId);
+      jptCall = utils.tryAppendQueryString(jptCall, 'member', memberId);
       utils.logMessage('appnexus.callBids: "memberId" will be deprecated soon. Please use "member" instead');
     }
 
-    jptCall = utils.tryAppendQueryString(jptCall, 'code', inventoryCode);
     jptCall = utils.tryAppendQueryString(jptCall, 'code', inventoryCode);
 
     //sizes takes a bit more logic
@@ -140,7 +143,7 @@ AppNexusAdapter = function AppNexusAdapter() {
   }
 
   //expose the callback to the global object:
-  pbjs.handleAnCB = function (jptResponseObj) {
+  $$PREBID_GLOBAL$$.handleAnCB = function (jptResponseObj) {
 
     var bidCode;
 
@@ -149,7 +152,7 @@ AppNexusAdapter = function AppNexusAdapter() {
       var responseCPM;
       var id = jptResponseObj.callback_uid;
       var placementCode = '';
-      var bidObj = bidmanager.getPlacementIdByCBIdentifer(id);
+      var bidObj = getBidRequest(id);
       if (bidObj) {
 
         bidCode = bidObj.bidder;
@@ -176,7 +179,7 @@ AppNexusAdapter = function AppNexusAdapter() {
         //store bid response
         //bid status is good (indicating 1)
         var adId = jptResponseObj.result.creative_id;
-        bid = bidfactory.createBid(1);
+        bid = bidfactory.createBid(1, bidObj);
         bid.creative_id = adId;
         bid.bidderCode = bidCode;
         bid.cpm = responseCPM;
@@ -194,10 +197,22 @@ AppNexusAdapter = function AppNexusAdapter() {
 
         // @endif
         //indicate that there is no bid for this placement
-        bid = bidfactory.createBid(2);
+        bid = bidfactory.createBid(2, bidObj);
         bid.bidderCode = bidCode;
         bidmanager.addBidResponse(placementCode, bid);
       }
+
+      if (!usersync) {
+        var iframe = utils.createInvisibleIframe();
+        iframe.src = '//acdn.adnxs.com/ib/static/usersync/v3/async_usersync.html';
+        try {
+          document.body.appendChild(iframe);
+        } catch (error) {
+          utils.logError(error);
+        }
+        usersync = true;
+      }
+
 
     } else {
       //no response data
@@ -213,13 +228,13 @@ AppNexusAdapter = function AppNexusAdapter() {
   return {
     callBids: baseAdapter.callBids,
     setBidderCode: baseAdapter.setBidderCode,
-    createNew: exports.createNew,
+    createNew: AppNexusAdapter.createNew,
     buildJPTCall: buildJPTCall
   };
 };
 
-exports.createNew = function () {
+AppNexusAdapter.createNew = function () {
   return new AppNexusAdapter();
 };
 
-// module.exports = AppNexusAdapter;
+module.exports = AppNexusAdapter;

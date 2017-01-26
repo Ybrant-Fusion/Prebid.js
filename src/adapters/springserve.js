@@ -48,7 +48,7 @@ SpringServeAdapter = function SpringServeAdapter() {
 
     spCall += '&domain=';
     spCall += domain;
-    spCall += '&callback=pbjs.handleSpringServeCB';
+    spCall += '&callback=$$PREBID_GLOBAL$$.handleSpringServeCB';
 
     return spCall;
   }
@@ -57,23 +57,29 @@ SpringServeAdapter = function SpringServeAdapter() {
     var bids = params.bids || [];
     for (var i = 0; i < bids.length; i++) {
       var bid = bids[i];
-      bidmanager.pbCallbackMap[bid.params.impId] = params;
+      //bidmanager.pbCallbackMap[bid.params.impId] = params;
       adloader.loadScript(buildSpringServeCall(bid));
     }
   }
 
-  pbjs.handleSpringServeCB = function (responseObj) {
+  $$PREBID_GLOBAL$$.handleSpringServeCB = function (responseObj) {
     if (responseObj && responseObj.seatbid && responseObj.seatbid.length > 0 &&
       responseObj.seatbid[0].bid[0] !== undefined) {
       //look up the request attributs stored in the bidmanager
       var responseBid = responseObj.seatbid[0].bid[0];
-      var requestObj = bidmanager.getPlacementIdByCBIdentifer(responseBid.impid);
+      //var requestObj = bidmanager.getPlacementIdByCBIdentifer(responseBid.impid);
+      var requestBids = $$PREBID_GLOBAL$$._bidsRequested.find(bidSet => bidSet.bidderCode === 'springserve');
+      if (requestBids && requestBids.bids.length > 0) {
+        requestBids = requestBids.bids.filter(bid => bid.params && bid.params.impId === +responseBid.impid);
+      } else {
+        requestBids = [];
+      }
       var bid = bidfactory.createBid(1);
       var placementCode;
 
       //assign properties from the original request to the bid object
-      for (var i = 0; i < requestObj.bids.length; i++) {
-        var bidRequest = requestObj.bids[i];
+      for (var i = 0; i < requestBids.length; i++) {
+        var bidRequest = requestBids[i];
         if (bidRequest.bidder === 'springserve') {
           placementCode = bidRequest.placementCode;
           var size = bidRequest.sizes[0];
@@ -82,7 +88,7 @@ SpringServeAdapter = function SpringServeAdapter() {
         }
       }
 
-      bid.bidderCode = requestObj.bidderCode;
+      if (requestBids[0]) {bid.bidderCode = requestBids[0].bidder;}
 
       if (responseBid.hasOwnProperty('price') && responseBid.hasOwnProperty('adm')) {
         //assign properties from the response to the bid object

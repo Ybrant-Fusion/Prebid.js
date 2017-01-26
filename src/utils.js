@@ -1,5 +1,4 @@
 var CONSTANTS = require('./constants.json');
-var polyfills = require('./polyfills');
 
 var objectType_object = 'object';
 var objectType_string = 'string';
@@ -7,19 +6,17 @@ var objectType_number = 'number';
 
 var _loggingChecked = false;
 
-var _lgPriceCap = 5.00;
-var _mgPriceCap = 20.00;
-var _hgPriceCap = 20.00;
-
 var t_Arr = 'Array';
 var t_Str = 'String';
 var t_Fn = 'Function';
+var t_Numb = 'Number';
 var toString = Object.prototype.toString;
 let infoLogger = null;
 try {
   infoLogger = console.info.bind(window.console);
 }
-catch (e) {}
+catch (e) {
+}
 
 /*
  *   Substitutes into a string from a given map using the token
@@ -59,7 +56,20 @@ function _getUniqueIdentifierStr() {
 //generate a random string (to be used as a dynamic JSONP callback)
 exports.getUniqueIdentifierStr = _getUniqueIdentifierStr;
 
-exports.getBidIdParamater = function (key, paramsObj) {
+/**
+ * Returns a random v4 UUID of the form xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx,
+ * where each x is replaced with a random hexadecimal digit from 0 to f,
+ * and y is replaced with a random hexadecimal digit from 8 to b.
+ * https://gist.github.com/jed/982883 via node-uuid
+ */
+exports.generateUUID = function generateUUID(placeholder) {
+  return placeholder ?
+    (placeholder ^ Math.random() * 16 >> placeholder/4).toString(16)
+    :
+    ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, generateUUID);
+};
+
+exports.getBidIdParameter = function (key, paramsObj) {
   if (paramsObj && paramsObj[key]) {
     return paramsObj[key];
   }
@@ -88,15 +98,15 @@ exports.parseQueryStringParameters = function (queryObj) {
 };
 
 //transform an AdServer targeting bids into a query string to send to the adserver
-//bid params should be an object such as {key: "value", key1 : "value1"}
-exports.transformAdServerTargetingObj = function (adServerTargeting) {
-  var result = '';
-  if (!adServerTargeting)
+exports.transformAdServerTargetingObj = function (targeting) {
+  // we expect to receive targeting for a single slot at a time
+  if (targeting && Object.getOwnPropertyNames(targeting).length > 0) {
+
+    return getKeys(targeting)
+      .map(key => `${key}=${encodeURIComponent(getValue(targeting, key))}`).join('&');
+  } else {
     return '';
-  for (var k in adServerTargeting)
-    if (adServerTargeting.hasOwnProperty(k))
-      result += k + '=' + encodeURIComponent(adServerTargeting[k]) + '&';
-  return result;
+  }
 };
 
 //Copy all of the properties in the source objects over to the target object
@@ -169,22 +179,42 @@ exports.parseGPTSingleSizeArray = function (singleSize) {
   }
 };
 
-exports.getTopWindowUrl = function () {
+exports.getTopWindowLocation = function () {
+  let location;
   try {
-    return window.top.location.href;
+    location = window.top.location;
   } catch (e) {
-    return window.location.href;
+    location = window.location;
+  }
+
+  return location;
+};
+
+exports.getTopWindowUrl = function () {
+  let href;
+  try {
+    href = this.getTopWindowLocation().href;
+  } catch (e) {
+    href = '';
+  }
+
+  return href;
+};
+
+exports.logWarn = function (msg) {
+  if (debugTurnedOn() && console.warn) {
+    console.warn('WARNING: ' + msg);
   }
 };
 
-exports.logInfo = function(msg, args) {
+exports.logInfo = function (msg, args) {
   if (debugTurnedOn() && hasConsoleLogger()) {
     if (infoLogger) {
       if (!args || args.length === 0) {
         args = '';
       }
 
-      infoLogger('INFO: ' + msg + ((args === '') ? '' : ' : params : '),  args);
+      infoLogger('INFO: ' + msg + ((args === '') ? '' : ' : params : '), args);
     }
   }
 };
@@ -207,12 +237,12 @@ var errLogFn = (function (hasLogger) {
 }(hasConsoleLogger()));
 
 var debugTurnedOn = function () {
-  if (pbjs.logging === false && _loggingChecked === false) {
-    pbjs.logging = getParameterByName(CONSTANTS.DEBUG_MODE).toUpperCase() === 'TRUE';
+  if ($$PREBID_GLOBAL$$.logging === false && _loggingChecked === false) {
+    $$PREBID_GLOBAL$$.logging = getParameterByName(CONSTANTS.DEBUG_MODE).toUpperCase() === 'TRUE';
     _loggingChecked = true;
   }
 
-  return !!pbjs.logging;
+  return !!$$PREBID_GLOBAL$$.logging;
 };
 
 exports.debugTurnedOn = debugTurnedOn;
@@ -220,7 +250,7 @@ exports.debugTurnedOn = debugTurnedOn;
 exports.logError = function (msg, code, exception) {
   var errCode = code || 'ERROR';
   if (debugTurnedOn() && hasConsoleLogger()) {
-    console[errLogFn].call(console, errCode + ': ' + msg, exception || '');
+    console[errLogFn](console, errCode + ': ' + msg, exception || '');
   }
 };
 
@@ -255,48 +285,6 @@ var getParameterByName = function (name) {
   }
 
   return decodeURIComponent(results[1].replace(/\+/g, ' '));
-};
-
-exports.getPriceBucketString = function (cpm) {
-  var low = '';
-  var med = '';
-  var high = '';
-  var cpmFloat = 0;
-  var returnObj = {
-    low: low,
-    med: med,
-    high: high
-  };
-  try {
-    cpmFloat = parseFloat(cpm);
-    if (cpmFloat) {
-      //round to closet .5
-      if (cpmFloat > _lgPriceCap) {
-        returnObj.low = _lgPriceCap.toFixed(2);
-      } else {
-        returnObj.low = (Math.floor(cpm * 2) / 2).toFixed(2);
-      }
-
-      //round to closet .1
-      if (cpmFloat > _mgPriceCap) {
-        returnObj.med = _mgPriceCap.toFixed(2);
-      } else {
-        returnObj.med = (Math.floor(cpm * 10) / 10).toFixed(2);
-      }
-
-      //round to closet .01
-      if (cpmFloat > _hgPriceCap) {
-        returnObj.high = _hgPriceCap.toFixed(2);
-      } else {
-        returnObj.high = (Math.floor(cpm * 100) / 100).toFixed(2);
-      }
-    }
-  } catch (e) {
-    this.logError('Exception parsing CPM :' + e.message);
-  }
-
-  return returnObj;
-
 };
 
 /**
@@ -359,6 +347,10 @@ exports.isArray = function (object) {
   return this.isA(object, t_Arr);
 };
 
+exports.isNumber = function(object) {
+  return this.isA(object, t_Numb);
+};
+
 /**
  * Return if the object is "empty";
  * this includes falsey, no keys, or no items at indices
@@ -376,6 +368,15 @@ exports.isEmpty = function (object) {
   }
 
   return true;
+};
+
+/**
+ * Return if string is empty, null, or undefined
+ * @param str string to test
+ * @returns {boolean} if string is empty
+ */
+exports.isEmptyStr = function(str) {
+  return this.isStr(str) && (!str || 0 === str.length);
 };
 
 /**
@@ -424,7 +425,8 @@ exports.indexOf = (function () {
     return Array.prototype.indexOf;
   }
 
-  return polyfills.indexOf;
+  // ie8 no longer supported
+  //return polyfills.indexOf;
 }());
 
 /**
@@ -494,3 +496,86 @@ exports.getIframeDocument = function (iframe) {
 
   return doc;
 };
+
+exports.getValueString = function(param, val, defaultValue) {
+  if (val === undefined || val === null) {
+    return defaultValue;
+  }
+  if (this.isStr(val) ) {
+    return val;
+  }
+  if (this.isNumber(val)) {
+    return val.toString();
+  }
+  this.logWarn('Unsuported type for param: ' + param + ' required type: String');
+};
+
+export function uniques(value, index, arry) {
+  return arry.indexOf(value) === index;
+}
+
+export function flatten(a, b) {
+  return a.concat(b);
+}
+
+export function getBidRequest(id) {
+  return $$PREBID_GLOBAL$$._bidsRequested.map(bidSet => bidSet.bids.find(bid => bid.bidId === id)).find(bid => bid);
+}
+
+export function getKeys(obj) {
+  return Object.keys(obj);
+}
+
+export function getValue(obj, key) {
+  return obj[key];
+}
+
+export function getBidderCodes(adUnits = $$PREBID_GLOBAL$$.adUnits) {
+  // this could memoize adUnits
+  return adUnits.map(unit => unit.bids.map(bid => bid.bidder)
+    .reduce(flatten, [])).reduce(flatten).filter(uniques);
+}
+
+export function isGptPubadsDefined() {
+  if (window.googletag && exports.isFn(window.googletag.pubads) && exports.isFn(window.googletag.pubads().getSlots)) {
+    return true;
+  }
+}
+
+export function getHighestCpm(previous, current) {
+  if (previous.cpm === current.cpm) {
+    return previous.timeToRespond > current.timeToRespond ? current : previous;
+  }
+
+  return previous.cpm < current.cpm ? current : previous;
+}
+
+/**
+ * Fisher–Yates shuffle
+ * http://stackoverflow.com/a/6274398
+ * https://bost.ocks.org/mike/shuffle/
+ * istanbul ignore next
+ */
+export function shuffle(array) {
+  let counter = array.length;
+
+  // while there are elements in the array
+  while (counter > 0) {
+    // pick a random index
+    let index = Math.floor(Math.random() * counter);
+
+    // decrease counter by 1
+    counter--;
+
+    // and swap the last element with it
+    let temp = array[counter];
+    array[counter] = array[index];
+    array[index] = temp;
+  }
+
+  return array;
+}
+
+export function adUnitsFilter(filter, bid) {
+  return filter.includes(bid && bid.placementCode || bid && bid.adUnitCode);
+}

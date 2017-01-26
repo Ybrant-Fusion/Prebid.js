@@ -1,7 +1,11 @@
 {
-  "maxErrors": 100,
-  "esnext": true,
+  "maxErrors": 1000,
   "requireTrailingComma": null,
   "requireCamelCaseOrUpperCaseIdentifiers": null,
-  "requireSpacesInAnonymousFunctionExpression": null
+  "requireSpacesInAnonymousFunctionExpression": null,
+  "validateIndentation": 2,
+  "disallowSpacesInFunctionDeclaration": {
+    "beforeOpeningRoundBrace": true
+  },
+  "disallowNewlineBeforeBlockStatements": true
 }

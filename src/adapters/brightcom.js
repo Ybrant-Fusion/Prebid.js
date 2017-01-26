@@ -8,7 +8,7 @@ var adloader = require('../adloader');
  * Adapter for requesting bids from Brightcom
  */
 var BrightcomAdapter = function BrightcomAdapter() {
-    
+
   // Set Brightcom Bidder URL
   var brightcomUrl = 'hb.iselephant.com/auc/ortb';
 
@@ -16,7 +16,7 @@ var BrightcomAdapter = function BrightcomAdapter() {
   var brightcomBidderCode = 'brightcom';
 
   // Define the callback function
-  var brightcomCallbackFunction = 'window.pbjs=window.pbjs||window.parent.pbjs||window.top.pbjs;window.pbjs.brightcomResponse';
+  var brightcomCallbackFunction = 'window.$$PREBID_GLOBAL$$=window.$$PREBID_GLOBAL$$||window.parent.$$PREBID_GLOBAL$$||window.top.$$PREBID_GLOBAL$$;window.$$PREBID_GLOBAL$$.brightcomResponse';
 
   // Manage the requested and received ad units' codes, to know which are invalid (didn't return)
   var reqAdUnitsCode = [],
@@ -28,7 +28,7 @@ var BrightcomAdapter = function BrightcomAdapter() {
 
     // Get page data
     var siteDomain = window.location.host;
-    var sitePage = window.location.pathname + location.search + location.hash;
+    var sitePage = window.location.href;
 
     // Prepare impressions object
     var brightcomImps = [];
@@ -40,15 +40,15 @@ var BrightcomAdapter = function BrightcomAdapter() {
     utils._each(bidRequests, function(bid) {
 
       // Get impression details
-      var tagId = utils.getBidIdParamater('tagId', bid.params);
-      var ref = utils.getBidIdParamater('ref', bid.params);
+      var tagId = utils.getBidIdParameter('tagId', bid.params);
+      var ref = utils.getBidIdParameter('ref', bid.params);
       var adWidth=0;
       var adHeight=0;
 
       // If no publisher id is set, use the current
       if (pubId === '') {
         // Get the current publisher id (if it doesn't exist, it'll return '')
-        pubId = utils.getBidIdParamater('pubId', bid.params);
+        pubId = utils.getBidIdParameter('pubId', bid.params);
       }
 
       // Brightcom supports only 1 size per impression
@@ -83,7 +83,7 @@ var BrightcomAdapter = function BrightcomAdapter() {
       // Add current impression to collection
       brightcomImps.push(imp);
       // Add mapping to current bid via impression id
-      bidmanager.pbCallbackMap[imp.id] = bid;
+      //bidmanager.pbCallbackMap[imp.id] = bid;
 
       // Add current ad unit's code to tracking
       reqAdUnitsCode.push(bid.placementCode);
@@ -116,15 +116,14 @@ var BrightcomAdapter = function BrightcomAdapter() {
         '&request=' + encodeURIComponent(JSON.stringify(brightcomBidReq));
 
     // Add the call to get the bid
-    adloader.loadScript(bidRequestCallUrl, null);
-    
+    adloader.loadScript(bidRequestCallUrl);
   }
 
   //expose the callback to the global object:
-  pbjs.brightcomResponse = function(brightcomResponseObj) {
-        
+  $$PREBID_GLOBAL$$.brightcomResponse = function(brightcomResponseObj) {
+
     var bid = {};
-        
+
     // Make sure response is valid
     if (
         (brightcomResponseObj) && (brightcomResponseObj.id) &&
@@ -136,17 +135,17 @@ var BrightcomAdapter = function BrightcomAdapter() {
       brightcomResponseObj.seatbid[0].bid.forEach( function(curBid) {
 
         // Get the bid request data
-        var	bidRequest = bidmanager.getPlacementIdByCBIdentifer(curBid.impid);
-                
+        var bidRequest = $$PREBID_GLOBAL$$._bidsRequested.find(bidSet => bidSet.bidderCode === 'brightcom').bids[0]; // this assumes a single request only
+
         // Make sure the bid exists
         if (bidRequest) {
-                    
+
           var placementCode = bidRequest.placementCode;
           bidRequest.status = CONSTANTS.STATUS.GOOD;
 
           curBid.placementCode = placementCode;
           curBid.size = bidRequest.sizes;
-                    
+
           // Get the creative
           var responseCreative = curBid.adm;
           // Build the NURL element
@@ -189,7 +188,7 @@ var BrightcomAdapter = function BrightcomAdapter() {
 
         }
       });
-            
+
     }
 
     // Define all unreceived ad unit codes as invalid (if Brightcom don't want to bid on an impression, it won't include it in the response)
