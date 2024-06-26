@@ -1,7 +1,7 @@
 # Overview
 
 ```
-Module Name: OMS Bid Adapter
+Module Name: OMS Bid Adapter !
 Module Type: Bidder Adapter
 Maintainer: alexandruc@onlinemediasolutions.com
 ```
